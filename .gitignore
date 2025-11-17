@@ -1,0 +1,8 @@
+dataset
+Data/
+.kaggle/
+
+__pycache__/
+*.pyc
+
+.idea/

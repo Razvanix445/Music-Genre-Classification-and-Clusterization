@@ -1,0 +1,23 @@
+Feature 1,Feature 2,Correlation
+rms_mean,harmony_var,0.8938978949769321
+rms_mean,mfcc1_mean,0.8072386551965721
+spectral_centroid_mean,spectral_bandwidth_mean,0.9044346071495829
+spectral_centroid_mean,rolloff_mean,0.9796372839713294
+spectral_centroid_mean,zero_crossing_rate_mean,0.8747491925002655
+spectral_centroid_mean,mfcc2_mean,-0.9401804325825631
+spectral_centroid_var,rolloff_var,0.8155497715224753
+spectral_centroid_var,zero_crossing_rate_var,0.8441413391352148
+spectral_bandwidth_mean,rolloff_mean,0.9561890507384935
+spectral_bandwidth_mean,mfcc2_mean,-0.8966520208522367
+spectral_bandwidth_var,rolloff_var,0.8848769664091609
+rolloff_mean,mfcc2_mean,-0.9343020027882711
+mfcc6_mean,mfcc8_mean,0.8373116484632848
+mfcc8_mean,mfcc10_mean,0.8118547065473206
+mfcc10_mean,mfcc12_mean,0.8081591518721893
+mfcc12_var,mfcc13_var,0.8120478485875313
+mfcc14_var,mfcc15_var,0.810825439588405
+mfcc15_var,mfcc16_var,0.8208510961351836
+mfcc16_var,mfcc17_var,0.8273181486552698
+mfcc17_var,mfcc18_var,0.8331488323994957
+mfcc18_var,mfcc19_var,0.8209858681502503
+mfcc19_var,mfcc20_var,0.8687180893195621
