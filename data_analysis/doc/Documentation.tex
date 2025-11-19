@@ -1,0 +1,347 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage{geometry}
+\usepackage{url}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+
+\linespread{1}
+
+\geometry{a4paper,top=3cm,left=3cm,right=2.5cm,bottom=2cm}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks,linkcolor=black,citecolor=blue}
+
+
+\title{\textbf{Software Project Component 2} \\[1ex] \large \textbf{Music Genre Classification and Clustering using GTZAN Dataset}}
+
+\author{\textbf{Author:} Răzvan-Ioan Călăuz, Ioana-Larisa Creț\\ \textbf{Group:} 246/1}
+
+\begin{document}
+
+\maketitle
+% \tableofcontents
+% \newpage
+
+\section{Introduction}
+
+The GTZAN dataset \cite{gtzan2002} is a benchmark for music genre classification, containing 1000 audio tracks distributed equally across 10 genres: blues, classical, country, disco, hiphop, jazz, metal, pop, reggae, and rock. Each 30-second audio clip has been processed to extract 57 audio features including spectral characteristics (chroma, spectral centroid, bandwidth), temporal features (RMS energy, zero-crossing rate), and MFCCs (Mel-Frequency Cepstral Coefficients).
+
+This analysis examines the dataset's statistical properties, feature relationships, and discriminative characteristics to inform our implementation of k-Nearest Neighbors (k-NN) classification and k-Means clustering algorithms. The analysis addresses:
+
+\begin{enumerate}
+    \item Feature statistics and variance patterns
+    \item Correlation between features and redundancy identification
+    \item Feature independence assessment
+    \item Feature importance for genre discrimination
+    \item Data distribution and outlier patterns
+    \item Visual exploration of class separability
+\end{enumerate}
+
+All analyses were performed using Python with pandas, numpy, matplotlib, seaborn, scipy, and scikit-learn libraries.
+
+\section{Basic Statistics}
+
+We calculated descriptive statistics (mean, standard deviation, variance, skewness, kurtosis) for all 57 features. Understanding these measures helps identify which features vary significantly across samples and which exhibit consistent patterns.
+
+\subsection{Feature Variance}
+
+Figure~\ref{fig:variance} shows the top 20 features ranked by variance. Variance indicates how spread out the feature values are - higher variance suggests the feature captures more diverse information across different songs and genres.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/feature_variance.png}
+\caption{Top 20 features by variance. Spectral features dominate the high-variance rankings, suggesting significant differences in frequency content across genres.}
+\label{fig:variance}
+\end{figure}
+
+\textbf{Key observations:}
+\begin{itemize}
+    \item \textbf{Spectral features} (spectral\_centroid, spectral\_bandwidth) show the highest variance, meaning genres differ significantly in their frequency characteristics. This is good - it means these features can help distinguish between genres.
+    \item \textbf{MFCC features} exhibit moderate to high variance, which reflects their ability to capture different timbral properties between genres.
+    \item \textbf{Temporal features} (RMS, zero-crossing rate) have lower variance, meaning energy patterns are relatively consistent across the dataset.
+\end{itemize}
+
+\subsection{Skewness Distribution}
+
+Skewness measures the asymmetry of a distribution. A skewness value near 0 indicates a symmetric (approximately normal) distribution, positive values indicate right-skew, and negative values indicate left-skew.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/skewness_distribution.png}
+\caption{Distribution of skewness values across all features. Most features show moderate skewness ($|skew| < 1$).}
+\label{fig:skewness}
+\end{figure}
+
+\textbf{What we found:}
+\begin{itemize}
+    \item Majority of features have moderate skewness ($|skewness| < 1$), which is reasonable
+    \item Several features, particularly energy-related ones, show right-skew (skewness $> 1$), meaning high values are more common than extremely low values
+    \item Few features are left-skewed
+    \item The presence of skewed distributions means we need to apply standardization (z-score normalization) before using distance-based algorithms like k-NN, otherwise features with larger scales will dominate the distance calculations
+\end{itemize}
+
+\section{Correlation Analysis}
+
+Correlation analysis reveals linear relationships between features. High correlations indicate redundancy - two features providing similar information. We computed Pearson correlation coefficients for all feature pairs, where values range from -1 (perfect negative correlation) to +1 (perfect positive correlation).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/correlation_heatmap.png}
+\caption{Correlation heatmap for top 20 features. Red indicates positive correlation, blue indicates negative correlation. Due to the large feature set (57 features), we display the top 20 features by mean absolute correlation.}
+\label{fig:correlation}
+\end{figure}
+
+\subsection{Highly Correlated Features}
+
+We identified feature pairs with $|correlation| > 0.8$, indicating strong linear relationships. A total of \textbf{22 highly correlated pairs} were found.
+
+\textbf{Main patterns observed:}
+\begin{itemize}
+    \item \textbf{Mean-variance pairs}: Features often correlate strongly between their mean and variance values (e.g., spectral\_centroid\_mean with spectral\_centroid\_var). This is expected since features with higher mean values typically show higher variance.
+    \item \textbf{MFCC correlations}: Consecutive MFCC coefficients show moderate correlation due to the overlapping nature of mel-frequency bins.
+    \item \textbf{Feature group patterns}: Features within the same category (spectral, temporal, chroma) correlate more strongly with each other than with features from other categories.
+    \item These correlations mean there's some redundancy in the feature set - we're measuring some aspects multiple times. For k-NN, this could bias distance calculations by giving too much weight to correlated features. We could remove one feature from each highly correlated pair (reducing from 57 to around 45 features) or use PCA to create uncorrelated features.
+\end{itemize}
+
+\section{Feature Independence}
+
+Independence testing determines whether features provide unique information. We use correlation as a proxy: features with $|correlation| > 0.7$ are considered dependent, while those with $|correlation| \leq 0.7$ are considered independent.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Total feature pairs analyzed & 1596 \\
+Dependent pairs ($|r| > 0.7$) & 52 \\
+Independent pairs ($|r| \leq 0.7$) & 1544 \\
+\textbf{Independence ratio} & \textbf{96.74\%} \\
+\bottomrule
+\end{tabular}
+\caption{Feature independence analysis results}
+\label{tab:independence}
+\end{table}
+
+The independence ratio of 96.74\% is very good. This means:
+
+\begin{itemize}
+    \item \textbf{Most features are independent}: 96.74\% of feature pairs show weak correlation, meaning they capture different aspects of the audio signals
+    \item \textbf{Low redundancy}: Only 3.26\% of feature pairs show strong dependence
+    \item The feature set is well-designed - the diverse feature types (spectral, temporal, timbral) successfully capture different aspects of music without too much overlap
+    \item This is favorable for both k-NN and k-Means since each feature contributes meaningful, non-redundant information to the distance/similarity calculations
+\end{itemize}
+
+\section{Feature Importance Analysis}
+
+We used Random Forest to determine which features are most discriminative for genre classification. The algorithm measures how much each feature contributes to reducing classification error.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/feature_importance.png}
+\caption{Top 20 features by importance for genre discrimination. chroma\_stft\_mean ranks highest, indicating that pitch and harmony information is most discriminative.}
+\label{fig:importance}
+\end{figure}
+
+\textbf{Key findings:}
+\begin{itemize}
+    \item \textbf{Top feature}: chroma\_stft\_mean (pitch/harmony content) is the most discriminative. This makes sense since different genres have characteristic harmonic progressions and pitch patterns.
+    \item \textbf{Feature type distribution}: The top 20 features include roughly 40\% spectral features, 35\% MFCCs, 15\% temporal features, and 10\% chroma features. This diversity is good - it shows genres differ across multiple audio dimensions.
+    \item \textbf{No single dominant category}: The fact that importance is distributed across feature types means no single aspect of audio (like just frequency or just rhythm) is sufficient for genre classification. We need multiple perspectives.
+\end{itemize}
+
+\section{Distribution Testing}
+
+We performed Shapiro-Wilk tests to check if features follow normal distributions. The null hypothesis is that data is normally distributed; p-values below 0.05 reject normality.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrc}
+\toprule
+\textbf{Test result} & \textbf{Count} & \textbf{Percentage} \\
+\midrule
+Normal distribution (p $\geq$ 0.05) & 1 & 1.75\% \\
+Non-normal distribution (p $<$ 0.05) & 56 & 98.25\% \\
+\textbf{Total features} & \textbf{57} & \textbf{100\%} \\
+\bottomrule
+\end{tabular}
+\caption{Shapiro-Wilk normality test results}
+\label{tab:normality}
+\end{table}
+
+\textbf{Results:}
+\begin{itemize}
+    \item 98.25\% (56 out of 57) features are \textbf{not normally distributed}
+    \item Only 1 feature passes the normality test
+    \item Most features show skewed or heavy-tailed distributions
+    \item This is important because many statistical assumptions (like using Euclidean distance) work best with normal data. With non-normal distributions, we should consider Manhattan distance or robust scaling methods that are less sensitive to distribution shape.
+\end{itemize}
+
+\section{Outlier Analysis}
+
+We used the IQR (Interquartile Range) method to detect outliers. Values below Q1 - 1.5×IQR or above Q3 + 1.5×IQR are considered outliers.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrc}
+\toprule
+\textbf{Category} & \textbf{Features} & \textbf{Percentage} \\
+\midrule
+Features with outliers & 57 & 100\% \\
+Features without outliers & 0 & 0\% \\
+\midrule
+\textbf{Average outliers per feature} & \textbf{42.5} & \textbf{4.25\%} \\
+\bottomrule
+\end{tabular}
+\caption{Outlier detection results using IQR method}
+\label{tab:outliers}
+\end{table}
+
+\textbf{What this means:}
+\begin{itemize}
+    \item \textbf{Every single feature} (100\%) contains outliers
+    \item On average, each feature has about 42-43 outliers (roughly 4.25\% of the 1000 samples)
+    \item These outliers are likely real characteristics of certain genres or songs (extreme metal might have very different spectral properties than classical), not measurement errors
+    \item For k-NN, outliers can significantly distort distance calculations. Manhattan distance is more robust to outliers than Euclidean distance. We should also consider robust scaling instead of standard scaling.
+    \item For k-Means, outliers can pull centroids away from the true cluster centers, affecting clustering quality
+\end{itemize}
+
+\section{Dimensionality Analysis with PCA}
+
+PCA (Principal Component Analysis) helps us understand how many dimensions are actually needed to represent the data. We applied PCA to standardized features and analyzed the cumulative explained variance.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/pca_cumulative_variance.png}
+\caption{Cumulative explained variance by number of principal components. The curve shows how much of the data's variance is captured as we add more components.}
+\label{fig:pca}
+\end{figure}
+
+\textbf{Key findings:}
+\begin{itemize}
+    \item To capture 90\% of the data's variance, we need \textbf{27-30 principal components}
+    \item This is relatively high (out of 57 total features), indicating the data has high intrinsic dimensionality
+    \item No single component dominates - the first component captures only about 15-20\% of variance
+    \item The gradual, smooth curve (no sharp "elbow") means information is distributed across many features rather than concentrated in a few
+    \item High dimensionality can be problematic for k-Means (curse of dimensionality), where distances become less meaningful in high-dimensional spaces
+\end{itemize}
+
+\section{Visual Analysis}
+
+\subsection{Standardized Feature Distributions}
+
+After standardization (z-score normalization), all features should have mean=0 and standard deviation=1. This puts all features on the same scale.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/standardized_distributions.png}
+\caption{Distribution of standardized features (top 12 by variance). Box plots show the median, quartiles, and outliers for each feature.}
+\label{fig:standardized}
+\end{figure}
+
+\textbf{Observations:}
+\begin{itemize}
+    \item Standardization successfully centers all features around 0 with similar spread
+    \item Many features still show outliers even after standardization, visible as points beyond the whiskers
+    \item Box plots reveal the non-normal nature of distributions - many are asymmetric
+    \item The presence of outliers in standardized space confirms they are genuine extreme values, not just scale artifacts
+\end{itemize}
+
+\subsection{Genre Distribution}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/genre_distribution.png}
+\caption{Distribution of samples across 10 genres. The dataset is perfectly balanced.}
+\label{fig:genre_dist}
+\end{figure}
+
+\textbf{Result:}
+\begin{itemize}
+    \item The dataset contains exactly 100 samples per genre
+    \item Perfect balance means there's no class imbalance problem - no genre is over- or under-represented
+    \item This is good for both k-NN and k-Means: we won't have bias toward majority classes, and evaluation metrics will be fair across all genres
+\end{itemize}
+
+\section{Conclusions}
+
+\subsection{Summary of Findings}
+
+Our comprehensive analysis of the GTZAN dataset revealed:
+
+\begin{enumerate}
+    \item \textbf{Dataset characteristics:} 1000 samples, 10 genres (perfectly balanced: 100/genre), 57 features spanning spectral, temporal, and timbral domains
+    
+    \item \textbf{Feature quality:}
+    \begin{itemize}
+        \item High independence ratio (96.74\%) - minimal redundancy
+        \item 22 highly correlated pairs - can reduce to ~45 features if needed
+        \item Spectral features show highest variance
+        \item Most features exhibit moderate skewness
+    \end{itemize}
+    
+    \item \textbf{Discriminative features:}
+    \begin{itemize}
+        \item Top feature: chroma\_stft\_mean (pitch/harmony)
+        \item Important features distributed across types: Spectral (40\%), MFCC (35\%), Temporal (15\%)
+        \item Diverse feature importance suggests genres differ in multiple audio aspects
+    \end{itemize}
+    
+    \item \textbf{Data distribution:}
+    \begin{itemize}
+        \item Nearly all features (>95\%) are non-normally distributed
+        \item Distributions are predominantly skewed (right or left)
+        \item All features show significant outliers
+        \item Outliers likely represent genuine genre-specific characteristics rather than errors
+    \end{itemize}
+    
+    \item \textbf{Dimensionality and complexity:}
+    \begin{itemize}
+        \item 27-30 principal components needed for 90\% variance
+        \item High intrinsic dimensionality indicates complex feature relationships
+        \item Gradual PCA curve suggests many features contribute meaningful information
+    \end{itemize}
+    
+    \item \textbf{Class separability:}
+    \begin{itemize}
+        \item Perfect class balance eliminates bias concerns
+        \item High dimensionality suggests moderate overlap between some genres
+        \item Feature independence and diversity indicate reasonable separability
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Final Remarks}
+
+The GTZAN dataset presents a challenging but well-structured problem for music genre classification and clustering. Our analysis revealed:
+
+\textbf{Strengths:}
+\begin{itemize}
+    \item Perfect class balance (100 samples per genre) eliminates bias
+    \item High feature independence (96.74\%) ensures diverse information
+    \item Multiple discriminative features across different audio aspects
+\end{itemize}
+
+\textbf{Challenges:}
+\begin{itemize}
+    \item High intrinsic dimensionality (27-30 components for 90\% variance)
+    \item Non-normal distributions with significant outliers
+    \item Moderate skewness in many features
+\end{itemize}
+
+\textbf{Key preprocessing requirements identified:}
+\begin{itemize}
+    \item Robust scaling is mandatory (not optional)
+    \item Manhattan distance or robust preprocessing for k-NN
+    \item PCA dimensionality reduction strongly recommended for k-Means
+\end{itemize}
+
+The high feature independence, diverse feature importance, and balanced classes create favorable conditions for classification. However, the high dimensionality, non-normal distributions, and abundant outliers require careful preprocessing. We expect k-NN to achieve 65-75\% accuracy with proper tuning, while k-Means will face greater challenges due to its sensitivity to dimensionality and outliers. The insights from this analysis provide a solid foundation for implementing both algorithms and understanding their expected performance characteristics.
+
+\bibliographystyle{alpha}
+\bibliography{biblio}
+
+\end{document}
