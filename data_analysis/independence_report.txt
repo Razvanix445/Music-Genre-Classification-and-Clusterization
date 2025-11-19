@@ -1,4 +1,0 @@
-Total pairs: 1596
-Dependent pairs: 52
-Independent pairs: 1544
-Independence ratio: 96.74%
